@@ -4,86 +4,78 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"time"
+	"strings"
 
-	"github.com/basedantoni/gokedex/internal/pokecache"
+	"github.com/basedantoni/gokedex/internal/pokeapi"
 )
+
+type config struct {
+	pokeapiClient    pokeapi.Client
+	nextLocationsURL *string
+	prevLocationsURL *string
+}
+
+func startRepl(cfg *config) {
+	reader := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("Pokedex > ")
+		reader.Scan()
+
+		words := cleanInput(reader.Text())
+		if len(words) == 0 {
+			continue
+		}
+
+		commandName := words[0]
+		areaName := words[1]
+
+		command, exists := getCommands()[commandName]
+		if exists {
+			err := command.callback(cfg, areaName)
+			if err != nil {
+				fmt.Println(err)
+			}
+			continue
+		} else {
+			fmt.Println("Unknown command")
+			continue
+		}
+	}
+}
+
+func cleanInput(text string) []string {
+	output := strings.ToLower(text)
+	words := strings.Fields(output)
+	return words
+}
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(c *config) error
-}
-
-type config struct {
-	Next 	 string
-	Previous string
-}
-
-type LocationArea struct {
-	Count    int    `json:"count"`
-	Next     string `json:"next"`
-	Previous string    `json:"previous"`
-	Results  []struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
-	} `json:"results"`
+	callback    func(*config, string) error
 }
 
 func getCommands() map[string]cliCommand {
-	return map[string]cliCommand {
+	return map[string]cliCommand{
 		"help": {
 			name:        "help",
 			description: "Displays a help message",
 			callback:    commandHelp,
+		},
+		"map": {
+			name:        "map",
+			description: "Get the next page of locations",
+			callback:    commandMapf,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Get the previous page of locations",
+			callback:    commandMapb,
 		},
 		"exit": {
 			name:        "exit",
 			description: "Exit the Pokedex",
 			callback:    commandExit,
 		},
-		"map": {
-			name:		 "map",
-			description: "Get next location areas",
-			callback:	 commandMap,
-		},
-		"mapb": {
-			name:		 "map back",
-			description: "Get previous location areas",
-			callback:	 commandMapb,
-		},
-	}
-}
-
-func printPrompt() {
-	fmt.Print("\npokedex > ")
-}
-
-func startRepl() {
-	reader := bufio.NewScanner(os.Stdin)
-	commands := getCommands()
-	c := config{Next: "", Previous: ""}
-	cache := pokecache.NewCache(time.Second * 5)
-	
-	printPrompt()
-	for reader.Scan() {
-		printPrompt()
-
-		input := reader.Text()
-
-		if _, ok := commands[input]; !ok {
-			fmt.Fprintln(os.Stderr, "invalid command")
-			continue
-		}
-
-		err :=commands[input].callback(&c)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
-	}
-
-	if err := reader.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 	}
 }

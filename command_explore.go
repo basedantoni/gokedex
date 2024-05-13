@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-func commandExit(c *config, s string) error {
+func commandExplore(c *config, area string) error {
 	os.Exit(0)
 	return nil
 }
